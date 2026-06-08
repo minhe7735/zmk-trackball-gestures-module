@@ -1,0 +1,19 @@
+description: |
+  Gesture behavior — activates trackball gesture emulation when held.
+
+  The single parameter selects the gesture mode:
+    1 = GESTURE_SWIPE2  (two-finger swipe)
+    2 = GESTURE_SWIPE3  (three-finger swipe)
+    3 = GESTURE_SWIPE4  (four-finger swipe)
+    4 = GESTURE_SWIPE5  (five-finger swipe)
+    5 = GESTURE_PINCH2  (two-finger pinch / zoom)
+    6 = GESTURE_PINCH3  (three-finger pinch)
+    7 = GESTURE_PINCH4  (four-finger pinch)
+    8 = GESTURE_PINCH5  (five-finger pinch)
+
+  Example keymap usage:
+    bindings = <&gesture 5>;   // pinch-to-zoom while held
+
+compatible: "zmk,behavior-gesture"
+
+include: one_param.yaml

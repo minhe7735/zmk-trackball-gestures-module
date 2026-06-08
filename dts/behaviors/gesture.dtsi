@@ -1,0 +1,24 @@
+/*
+ * Default device-tree include for the trackball gesture module.
+ *
+ * Provides:
+ *   &gesture           — behavior node (use in keymaps)
+ *   &gesture_processor — input processor (use in input listeners)
+ *
+ * Users include this via:
+ *   #include <behaviors/gesture.dtsi>
+ */
+
+/ {
+    behaviors {
+        /omit-if-no-ref/ gesture: gesture {
+            compatible = "zmk,behavior-gesture";
+            #binding-cells = <1>;
+        };
+    };
+
+    gesture_processor: gesture_processor {
+        compatible = "zmk,input-processor-gesture";
+        #input-processor-cells = <0>;
+    };
+};

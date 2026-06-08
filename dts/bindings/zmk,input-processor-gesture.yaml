@@ -1,0 +1,17 @@
+description: |
+  Input processor that intercepts trackball movement when a gesture mode
+  is active.  Place this in your input listener's processor chain so that
+  REL_X / REL_Y events are consumed and fed into the gesture engine
+  instead of moving the pointer.
+
+  When no gesture is active the processor passes events through unchanged.
+
+  Example device-tree snippet:
+
+    &trackball_listener {
+        input-processors = <&gesture_processor>;
+    };
+
+compatible: "zmk,input-processor-gesture"
+
+include: ip_zero_param.yaml

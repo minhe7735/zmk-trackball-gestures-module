@@ -1,0 +1,11 @@
+#pragma once
+
+#define GESTURE_NONE   0
+#define GESTURE_SWIPE2 1
+#define GESTURE_SWIPE3 2
+#define GESTURE_SWIPE4 3
+#define GESTURE_SWIPE5 4
+#define GESTURE_PINCH2 5
+#define GESTURE_PINCH3 6
+#define GESTURE_PINCH4 7
+#define GESTURE_PINCH5 8
