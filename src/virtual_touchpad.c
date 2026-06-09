@@ -41,9 +41,6 @@ static const uint8_t touchpad_hid_report_desc[] = {
 /** Handle to the HID device obtained from device_get_binding(). */
 static const struct device *hid_dev;
 
-/** Monotonically increasing scan-time counter (wraps at UINT16_MAX). */
-static uint16_t scan_time_counter;
-
 /** True once the HID interface has been successfully initialized. */
 static bool touchpad_ready;
 
@@ -63,10 +60,10 @@ static uint8_t button_switch = 1;
 /* Feature report data                                                 */
 /* ------------------------------------------------------------------ */
 
-/** Max Contact Count = 5, Pad Type = 0 (depressible click-pad). */
+/** Max Contact Count, Pad Type = 0 (depressible click-pad). */
 static const struct touchpad_feature_max_count feature_max_count = {
     .report_id = TOUCHPAD_FEATURE_MAX_COUNT_ID,
-    .max_count = 0x05,
+    .max_count = CONFIG_ZMK_TRACKBALL_GESTURES_MAX_FINGERS,
     .pad_type  = 0x00,
 };
 
@@ -137,7 +134,7 @@ static int touchpad_get_report(const struct device *dev,
     case TOUCHPAD_FEATURE_MAX_COUNT_ID:
         *data = (uint8_t *)&feature_max_count;
         *len = sizeof(feature_max_count);
-        LOG_DBG("GET_REPORT: max contact count (5), len=%d", *len);
+        LOG_DBG("GET_REPORT: max contact count (%d), len=%d", feature_max_count.max_count, *len);
         break;
 
     case TOUCHPAD_FEATURE_PTPHQA_ID:
@@ -273,7 +270,6 @@ int virtual_touchpad_init(void)
         return ret;
     }
 
-    scan_time_counter = 0;
     touchpad_ready = true;
 
     LOG_INF("Virtual touchpad initialized (descriptor %zu bytes)",
@@ -287,7 +283,7 @@ int virtual_touchpad_send_report(const struct touchpad_report *report)
         return -EINVAL;
     }
 
-    if (!touchpad_ready || !hid_dev) {
+    if (!virtual_touchpad_is_ready()) {
         LOG_WRN("Touchpad not ready — dropping report");
         return -ENODEV;
     }
@@ -300,22 +296,32 @@ int virtual_touchpad_send_report(const struct touchpad_report *report)
 
     hid_report.report_id = TOUCHPAD_REPORT_ID;
 
-    for (int i = 0; i < TOUCHPAD_MAX_CONTACTS; i++) {
-        const struct touchpad_contact *src = &report->contacts[i];
+    /* The HID descriptor statically defines 5 finger collections.
+     * We must populate all 5 slots with strictly unique contact IDs,
+     * even if the module is configured to use fewer contacts. */
+    for (int i = 0; i < 5; i++) {
         struct touchpad_contact_report *dst = &hid_report.contacts[i];
 
-        /*
-         * Pack the flags byte:
-         *   Bit 0 : Confidence (always 1 for valid hardware contacts)
-         *   Bit 1 : Tip Switch
-         */
-        dst->flags = (uint8_t)(
-            (1U << 0)                        /* confidence (always 1) */
-          | ((src->active ? 1U : 0U) << 1)   /* tip switch            */
-        );
-        dst->contact_id = i;                 /* strictly unique contact ID */
-        dst->x = src->x;
-        dst->y = src->y;
+        if (i < TOUCHPAD_MAX_CONTACTS) {
+            const struct touchpad_contact *src = &report->contacts[i];
+            /*
+             * Pack the flags byte:
+             *   Bit 0 : Confidence (always 1 for valid hardware contacts)
+             *   Bit 1 : Tip Switch
+             */
+            dst->flags = (uint8_t)(
+                (1U << 0)                        /* confidence (always 1) */
+              | ((src->active ? 1U : 0U) << 1)   /* tip switch            */
+            );
+            dst->x = src->x;
+            dst->y = src->y;
+        } else {
+            /* Inactive contact to pad the report */
+            dst->flags = (1U << 0);              /* confidence (always 1), tip switch = 0 */
+            dst->x = 0;
+            dst->y = 0;
+        }
+        dst->contact_id = i;                     /* strictly unique contact ID */
     }
 
     /* Scan time: real elapsed time in 100µs units (unit exponent -4).

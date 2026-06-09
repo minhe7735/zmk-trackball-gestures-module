@@ -18,7 +18,7 @@ All gestures produce **real multi-contact touchpad reports** — the host OS see
 
 - [ZMK Firmware](https://zmk.dev) with pointing device support enabled
 - A trackball sensor wired to your keyboard (e.g., PMW3610, PMW3389, ADNS-9800)
-- USB or BLE connection to a host that supports multi-touch touchpad input
+- USB connection to a host that supports multi-touch touchpad input (BLE is currently not tested/supported)
 
 ## Installation
 
@@ -47,12 +47,25 @@ Then rebuild your firmware. The module is enabled by default once added.
 
 ## Configuration
 
+### Device Tree Setup
+
+Because this module operates as a native ZMK Input Processor, you must attach it to your trackball's device node in your `.dtsi` or `.keymap` file. This tells ZMK to route the trackball's movement data through the gesture engine.
+
+```dts
+&trackball {
+    /* Route this specific trackball through the gesture module */
+    input-processors = <&gesture_processor>;
+};
+```
+
+*Note for dual-trackball users: If you have two trackballs, you can attach the processor to just one of them (dedicating it to gestures while the other remains a normal mouse) or attach it to both.*
+
 ### Keymap Setup
 
 The module provides a `&gesture` behavior that you bind in your keymap. Each binding specifies the gesture type to activate while the key is held:
 
 ```dts
-#include <dt-bindings/zmk/gesture.h>
+#include <dt-bindings/zmk/trackball_gestures.h>
 
 / {
     keymap {
@@ -77,24 +90,26 @@ While a gesture key is held, trackball movement is captured and translated into 
 
 All options can be set in your board's `.conf` file or `prj.conf`:
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `CONFIG_ZMK_TRACKBALL_GESTURES` | bool | `y` | Master enable for the module |
-| `CONFIG_ZMK_TRACKBALL_GESTURES_MAX_FINGERS` | int | `5` | Maximum virtual finger contacts (2–5) |
-| `CONFIG_ZMK_TRACKBALL_GESTURES_REPORT_RATE_MS` | int | `8` | Report interval in ms (8 = 125 Hz) |
-| `CONFIG_ZMK_TRACKBALL_GESTURES_TP_LOGICAL_MAX` | int | `32767` | Logical X/Y maximum of virtual touchpad |
-| `CONFIG_ZMK_TRACKBALL_GESTURES_TP_PHYSICAL_MAX` | int | `3200` | Physical size of the emulated touchpad in 100ths of an inch |
-| `CONFIG_ZMK_TRACKBALL_GESTURES_IDLE_TIMEOUT_MS` | int | `100` | Idle timeout before fingers lift (ms) |
-| `CONFIG_ZMK_TRACKBALL_GESTURES_SENSITIVITY` | int | `10` | Trackball delta multiplier |
-| `CONFIG_ZMK_TRACKBALL_GESTURES_PINCH_BASE_DISTANCE` | int | `800` | Initial finger distance for pinch (logical units) |
-| `CONFIG_ZMK_TRACKBALL_GESTURES_FINGER_SPACING` | int | `800` | Spacing between fingers in multi-finger swipes |
+| Option | Type | Default | Range | Description |
+|--------|------|---------|-------|-------------|
+| `CONFIG_ZMK_TRACKBALL_GESTURES` | bool | `y` | - | Master enable for the module. |
+| `CONFIG_USB_HID_DEVICE_COUNT` | int | `2` | - | Global ZMK config. Forced to 2 by this module to allow the virtual touchpad to register alongside the keyboard. |
+| `CONFIG_ZMK_TRACKBALL_GESTURES_MAX_FINGERS` | int | `5` | `2 - 5` | Maximum virtual finger contacts. |
+| `CONFIG_ZMK_TRACKBALL_GESTURES_SWIPE_AXIS_LOCK` | bool | `y` | - | Dominant axis snapping. Automatically locks multi-finger swipes to a straight vertical or horizontal line to prevent diagonal drift. |
+| `CONFIG_ZMK_TRACKBALL_GESTURES_REPORT_RATE_MS` | int | `8` | - | Report interval in ms (8 = 125 Hz). |
+| `CONFIG_ZMK_TRACKBALL_GESTURES_TP_LOGICAL_MAX` | int | `32767` | `100 - 32767` | Logical X/Y maximum of the virtual touchpad. Defines the coordinate resolution. |
+| `CONFIG_ZMK_TRACKBALL_GESTURES_TP_PHYSICAL_MAX` | int | `3200` | `100 - 32767` | Physical size of the emulated touchpad in 100ths of an inch (3200 = 32 inches). Dictates OS swipe distance scaling. |
+| `CONFIG_ZMK_TRACKBALL_GESTURES_IDLE_TIMEOUT_MS` | int | `100` | `50 - 2000` | Trackball idle timeout before virtual fingers lift. Acts as an auto-centering mechanism for consecutive swipes. |
+| `CONFIG_ZMK_TRACKBALL_GESTURES_SENSITIVITY` | int | `10` | `1 - 500` | Multiplies raw hardware ticks. E.g., moving 2 physical ticks with a sensitivity of 10 tells the OS you moved 20 pixels. Increase to make gestures feel faster. |
+| `CONFIG_ZMK_TRACKBALL_GESTURES_PINCH_BASE_DISTANCE` | int | `8000` | `1 - 16000` | Distance between virtual fingers when pinch-to-zoom starts. Rolling down pushes them apart (Zoom In), rolling up pulls them closer (Zoom Out). |
+| `CONFIG_ZMK_TRACKBALL_GESTURES_FINGER_SPACING` | int | `800` | `1 - 8191` | Distance between virtual fingers in multi-finger swipes. Ensures fingers are spaced widely enough to avoid OS palm-rejection errors. |
 
 Example `.conf`:
 
 ```ini
 CONFIG_ZMK_TRACKBALL_GESTURES=y
 CONFIG_ZMK_TRACKBALL_GESTURES_SENSITIVITY=15
-CONFIG_ZMK_TRACKBALL_GESTURES_REPORT_RATE_MS=4
+CONFIG_ZMK_TRACKBALL_GESTURES_IDLE_TIMEOUT_MS=150
 ```
 
 ## How It Works

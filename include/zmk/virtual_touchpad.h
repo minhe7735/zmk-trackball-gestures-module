@@ -15,11 +15,7 @@
 #include <stdbool.h>
 
 /** Maximum number of simultaneous finger contacts. */
-#define TOUCHPAD_MAX_CONTACTS 5
-
-/** Touchpad coordinate range (0 – 4095). */
-#define TOUCHPAD_X_MAX 4095
-#define TOUCHPAD_Y_MAX 4095
+#define TOUCHPAD_MAX_CONTACTS CONFIG_ZMK_TRACKBALL_GESTURES_MAX_FINGERS
 
 /**
  * A single finger contact.
@@ -27,8 +23,8 @@
 struct touchpad_contact {
     bool active;     /**< Tip switch — finger is touching the surface. */
     uint8_t id;      /**< Contact identifier (0–4). */
-    uint16_t x;      /**< Absolute X position (0–4095). */
-    uint16_t y;      /**< Absolute Y position (0–4095). */
+    uint16_t x;      /**< Absolute X position. */
+    uint16_t y;      /**< Absolute Y position. */
 };
 
 /**

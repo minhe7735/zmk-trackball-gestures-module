@@ -26,6 +26,15 @@ config ZMK_TRACKBALL_GESTURES_MAX_FINGERS
       five-finger swipe. Reducing this value saves memory but limits
       available gesture types.
 
+config ZMK_TRACKBALL_GESTURES_SWIPE_AXIS_LOCK
+    bool "Dominant axis snapping for swipe gestures"
+    default y
+    help
+      If enabled, multi-finger swipes will lock to the dominant axis 
+      (either strictly vertical or strictly horizontal) after the initial
+      movement. This prevents diagonal drift and makes OS gestures like
+      switching workspaces much more reliable.
+
 config ZMK_TRACKBALL_GESTURES_REPORT_RATE_MS
     int "Report rate in milliseconds"
     default 8
@@ -40,7 +49,7 @@ config ZMK_TRACKBALL_GESTURES_REPORT_RATE_MS
 config ZMK_TRACKBALL_GESTURES_IDLE_TIMEOUT_MS
     int "Idle timeout before fingers lift (ms)"
     default 100
-    range 0 5000
+    range 50 2000
     help
       The time in milliseconds the trackball must remain idle before the
       virtual fingers are lifted from the trackpad surface. This acts as
@@ -52,7 +61,7 @@ config ZMK_TRACKBALL_GESTURES_IDLE_TIMEOUT_MS
 config ZMK_TRACKBALL_GESTURES_TP_LOGICAL_MAX
     int "Logical touchpad size (X/Y maximum)"
     default 32767
-    range 100 65535
+    range 100 32767
     help
       The logical maximum coordinate of the emulated touchpad surface.
       This value is reported in the HID descriptor and defines the
@@ -63,7 +72,7 @@ config ZMK_TRACKBALL_GESTURES_TP_LOGICAL_MAX
 config ZMK_TRACKBALL_GESTURES_TP_PHYSICAL_MAX
     int "Physical touchpad size (X/Y maximum in 100ths of an inch)"
     default 3200
-    range 100 65535
+    range 100 32767
     help
       The physical size of the emulated touchpad, reported in the HID
       descriptor. This dictates how the host OS scales swipe distances.
@@ -84,8 +93,8 @@ config ZMK_TRACKBALL_GESTURES_SENSITIVITY
 
 config ZMK_TRACKBALL_GESTURES_PINCH_BASE_DISTANCE
     int "Initial distance between pinch fingers (logical units)"
-    default 800
-    range 1 32767
+    default 8000
+    range 1 16000
     help
       The initial distance in logical touchpad units between the two
       virtual fingers when a pinch gesture begins. Trackball movement
@@ -96,7 +105,7 @@ config ZMK_TRACKBALL_GESTURES_PINCH_BASE_DISTANCE
 config ZMK_TRACKBALL_GESTURES_FINGER_SPACING
     int "Spacing between multi-finger swipe contacts (logical units)"
     default 800
-    range 1 32767
+    range 1 8191
     help
       The distance in logical touchpad units between adjacent virtual
       finger contacts during multi-finger swipe gestures. This spacing

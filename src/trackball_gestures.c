@@ -8,7 +8,7 @@
  * This file is the heart of the zmk-trackball-gestures module.  It:
  *
  *   1.  Maintains virtual finger contacts on a logical touchpad surface
- *       (0 … 4095 in both axes, center at 2048,2048).
+ *       (0 … TP_MAX in both axes).
  *
  *   2.  Translates accumulated trackball deltas into per-gesture contact
  *       position updates (pinch spread, scroll pan, multi-finger swipe).
@@ -34,6 +34,7 @@
 #include <zephyr/sys/util.h>
 #include <zephyr/input/input.h>
 #include <zephyr/logging/log.h>
+#include <stdlib.h>
 
 #include <drivers/input_processor.h>
 #include <zmk/trackball_gestures.h>
@@ -73,19 +74,10 @@ LOG_MODULE_REGISTER(trackball_gestures, CONFIG_ZMK_LOG_LEVEL);
 #define FINGER_SPACING   CONFIG_ZMK_TRACKBALL_GESTURES_FINGER_SPACING
 
 /** Pinch offset lower clamp – keeps contacts well inside the surface. */
-#define PINCH_OFFSET_MIN 300
+#define PINCH_OFFSET_MIN 100
 /** Pinch offset upper clamp. */
-#define PINCH_OFFSET_MAX 1800
+#define PINCH_OFFSET_MAX (TP_CENTER - 100)
 
-/**
- * Edge proximity threshold for swipe position wrapping.
- * When any contact is within this many units of a touchpad edge the
- * whole cluster is reset to centre.
- */
-#define EDGE_WRAP_MARGIN 300
-
-/** Maximum number of simultaneous contacts we ever report. */
-#define MAX_CONTACTS     5
 
 /* ================================================================== */
 /* Module state                                                        */
@@ -117,6 +109,15 @@ static struct k_work gesture_work;
 /* Per-gesture running state                                           */
 /* ------------------------------------------------------------------ */
 
+enum swipe_locked_axis {
+    AXIS_UNLOCKED = 0,
+    AXIS_X,
+    AXIS_Y
+};
+
+/** Dominant axis lock for swipe gestures. */
+static enum swipe_locked_axis current_locked_axis = AXIS_UNLOCKED;
+
 /**
  * For PINCH: current half-distance between the two contacts.
  * Starts at CONFIG_ZMK_TRACKBALL_GESTURES_PINCH_BASE_DISTANCE.
@@ -140,28 +141,25 @@ static bool fingers_lifted_idle;
 /* Helpers                                                             */
 /* ================================================================== */
 
-/** Clamp a coordinate to the valid touchpad range [0, TP_MAX]. */
-static inline int32_t clamp_coord(int32_t v)
-{
-    return CLAMP(v, 0, TP_MAX);
-}
 
 /**
  * Return the number of contacts for a given gesture mode.
  */
 static int contacts_for_mode(enum gesture_mode mode)
 {
+    int num = 0;
     switch (mode) {
-    case GESTURE_SWIPE2: return 2;
-    case GESTURE_SWIPE3: return 3;
-    case GESTURE_SWIPE4: return 4;
-    case GESTURE_SWIPE5: return 5;
-    case GESTURE_PINCH2: return 2;
-    case GESTURE_PINCH3: return 3;
-    case GESTURE_PINCH4: return 4;
-    case GESTURE_PINCH5: return 5;
-    default:             return 0;
+    case GESTURE_SWIPE2: num = 2; break;
+    case GESTURE_SWIPE3: num = 3; break;
+    case GESTURE_SWIPE4: num = 4; break;
+    case GESTURE_SWIPE5: num = 5; break;
+    case GESTURE_PINCH2: num = 2; break;
+    case GESTURE_PINCH3: num = 3; break;
+    case GESTURE_PINCH4: num = 4; break;
+    case GESTURE_PINCH5: num = 5; break;
+    default:             num = 0; break;
     }
+    return MIN(num, CONFIG_ZMK_TRACKBALL_GESTURES_MAX_FINGERS);
 }
 
 /* ================================================================== */
@@ -208,8 +206,8 @@ static void build_pinch_report(struct touchpad_report *report, int num_contacts,
     for (int i = 0; i < num_contacts; i++) {
         report->contacts[i].active = fingers_down ? 1 : 0;
         report->contacts[i].id = (uint8_t)i;
-        report->contacts[i].x = (uint16_t)clamp_coord(TP_CENTER + pos[i].x);
-        report->contacts[i].y = (uint16_t)clamp_coord(TP_CENTER + pos[i].y);
+        report->contacts[i].x = (uint16_t)(TP_CENTER + pos[i].x);
+        report->contacts[i].y = (uint16_t)(TP_CENTER + pos[i].y);
     }
 
     LOG_DBG("pinch%d: offset=%d", num_contacts, pinch_offset);
@@ -238,8 +236,8 @@ static void build_swipe_report(struct touchpad_report *report,
     report->contact_count = fingers_down ? (uint8_t)num_contacts : 0;
 
     for (int i = 0; i < num_contacts; i++) {
-        int32_t fx = clamp_coord(cx - half_span + i * FINGER_SPACING);
-        int32_t fy = clamp_coord(cy);
+        int32_t fx = cx - half_span + i * FINGER_SPACING;
+        int32_t fy = cy;
 
         report->contacts[i].active = fingers_down ? 1 : 0;
         report->contacts[i].id = (uint8_t)i;
@@ -316,6 +314,7 @@ static void gesture_work_handler(struct k_work *work)
         if (fingers_lifted_idle) {
             cluster_x = 0;
             cluster_y = 0;
+            current_locked_axis = AXIS_UNLOCKED;
             fingers_lifted_idle = false;
         }
     } else {
@@ -352,12 +351,35 @@ static void gesture_work_handler(struct k_work *work)
     case GESTURE_SWIPE5: {
         int nc = contacts_for_mode(current_mode);
 
+#if IS_ENABLED(CONFIG_ZMK_TRACKBALL_GESTURES_SWIPE_AXIS_LOCK)
+        if (current_locked_axis == AXIS_UNLOCKED) {
+            int32_t abs_x = abs(cluster_x + dx);
+            int32_t abs_y = abs(cluster_y + dy);
+            
+            /* Wait for 50 logical units of movement to determine dominant axis */
+            if (abs_x > 50 || abs_y > 50) {
+                if (abs_x > abs_y) {
+                    current_locked_axis = AXIS_X;
+                    cluster_y = 0;
+                    dy = 0;
+                } else {
+                    current_locked_axis = AXIS_Y;
+                    cluster_x = 0;
+                    dx = 0;
+                }
+            }
+        } else if (current_locked_axis == AXIS_X) {
+            dy = 0;
+        } else if (current_locked_axis == AXIS_Y) {
+            dx = 0;
+        }
+#endif
+
         cluster_x += dx;
         cluster_y += dy;
 
-        /* No edge wrapping! Infinite logical bounds handles it naturally. */
-
-        /* Clamp to keep the widest contact inside bounds. */
+        /* Clamp to keep the widest contact inside bounds, 
+         * preventing integral wind-up against the edges. */
         int32_t half_span = (int32_t)(nc - 1) * FINGER_SPACING / 2;
         cluster_x = CLAMP(cluster_x,
                           -(TP_CENTER - half_span),
@@ -401,6 +423,11 @@ void gesture_mode_activate(enum gesture_mode mode)
         return;
     }
 
+    if (!virtual_touchpad_is_ready()) {
+        LOG_WRN("Virtual touchpad not ready — ignoring gesture activation");
+        return;
+    }
+
     /* If already active, deactivate the previous mode first. */
     if (gesture_active) {
         LOG_DBG("Deactivating previous gesture before activating mode %d", mode);
@@ -423,6 +450,7 @@ void gesture_mode_activate(enum gesture_mode mode)
     pinch_offset = CONFIG_ZMK_TRACKBALL_GESTURES_PINCH_BASE_DISTANCE;
     cluster_x = 0;
     cluster_y = 0;
+    current_locked_axis = AXIS_UNLOCKED;
     last_movement_time = k_uptime_get_32();
     fingers_lifted_idle = false;
 
