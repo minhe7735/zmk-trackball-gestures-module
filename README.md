@@ -82,11 +82,12 @@ All options can be set in your board's `.conf` file or `prj.conf`:
 | `CONFIG_ZMK_TRACKBALL_GESTURES` | bool | `y` | Master enable for the module |
 | `CONFIG_ZMK_TRACKBALL_GESTURES_MAX_FINGERS` | int | `5` | Maximum virtual finger contacts (2–5) |
 | `CONFIG_ZMK_TRACKBALL_GESTURES_REPORT_RATE_MS` | int | `8` | Report interval in ms (8 = 125 Hz) |
-| `CONFIG_ZMK_TRACKBALL_GESTURES_TOUCHPAD_WIDTH` | int | `4095` | Logical X maximum of virtual touchpad |
-| `CONFIG_ZMK_TRACKBALL_GESTURES_TOUCHPAD_HEIGHT` | int | `4095` | Logical Y maximum of virtual touchpad |
+| `CONFIG_ZMK_TRACKBALL_GESTURES_TP_LOGICAL_MAX` | int | `32767` | Logical X/Y maximum of virtual touchpad |
+| `CONFIG_ZMK_TRACKBALL_GESTURES_TP_PHYSICAL_MAX` | int | `3200` | Physical size of the emulated touchpad in 100ths of an inch |
+| `CONFIG_ZMK_TRACKBALL_GESTURES_IDLE_TIMEOUT_MS` | int | `100` | Idle timeout before fingers lift (ms) |
 | `CONFIG_ZMK_TRACKBALL_GESTURES_SENSITIVITY` | int | `10` | Trackball delta multiplier |
 | `CONFIG_ZMK_TRACKBALL_GESTURES_PINCH_BASE_DISTANCE` | int | `800` | Initial finger distance for pinch (logical units) |
-| `CONFIG_ZMK_TRACKBALL_GESTURES_FINGER_SPACING` | int | `200` | Spacing between fingers in multi-finger swipes |
+| `CONFIG_ZMK_TRACKBALL_GESTURES_FINGER_SPACING` | int | `800` | Spacing between fingers in multi-finger swipes |
 
 Example `.conf`:
 
@@ -124,7 +125,7 @@ CONFIG_ZMK_TRACKBALL_GESTURES_REPORT_RATE_MS=4
 | OS | Status | Notes |
 |----|--------|-------|
 | **Linux** | ✅ Full support | libinput recognizes multi-touch reports; works with GNOME, KDE, Sway, Niri, etc. |
-| **Windows 10/11** | ❓ Untested | Needs real-world testing to confirm native gesture support |
+| **Windows 10/11** | ⚠️ Limited testing | Implements Microsoft PTP specs, tested to work with native gestures |
 | **macOS** | ❓ Untested | macOS does not natively support multi-touch HID over USB/BLE; may require third-party drivers |
 
 ## License

@@ -52,7 +52,7 @@ LOG_MODULE_REGISTER(trackball_gestures, CONFIG_ZMK_LOG_LEVEL);
 
 /** Base half-distance between the two pinch contacts (in touchpad units). */
 #ifndef CONFIG_ZMK_TRACKBALL_GESTURES_PINCH_BASE_DISTANCE
-#define CONFIG_ZMK_TRACKBALL_GESTURES_PINCH_BASE_DISTANCE 300
+#define CONFIG_ZMK_TRACKBALL_GESTURES_PINCH_BASE_DISTANCE 800
 #endif
 
 /** Interval between periodic HID reports (milliseconds). */
@@ -64,16 +64,16 @@ LOG_MODULE_REGISTER(trackball_gestures, CONFIG_ZMK_LOG_LEVEL);
 /* Constants                                                           */
 /* ================================================================== */
 
-/** Full extent of the virtual touchpad coordinate space. */
-#define TP_MAX           4095
-/** Centre of the virtual touchpad. */
-#define TP_CENTER        2048
+/** Logical bounds of the virtual trackpad (0 to TP_MAX). */
+#define TP_MAX           CONFIG_ZMK_TRACKBALL_GESTURES_TP_LOGICAL_MAX
+/** Centre coordinate of the virtual trackpad. */
+#define TP_CENTER        (TP_MAX / 2)
 
 /** Spacing between adjacent fingers in multi-finger swipe gestures. */
-#define FINGER_SPACING   200
+#define FINGER_SPACING   CONFIG_ZMK_TRACKBALL_GESTURES_FINGER_SPACING
 
 /** Pinch offset lower clamp – keeps contacts well inside the surface. */
-#define PINCH_OFFSET_MIN 100
+#define PINCH_OFFSET_MIN 300
 /** Pinch offset upper clamp. */
 #define PINCH_OFFSET_MAX 1800
 
@@ -82,7 +82,7 @@ LOG_MODULE_REGISTER(trackball_gestures, CONFIG_ZMK_LOG_LEVEL);
  * When any contact is within this many units of a touchpad edge the
  * whole cluster is reset to centre.
  */
-#define EDGE_WRAP_MARGIN 200
+#define EDGE_WRAP_MARGIN 300
 
 /** Maximum number of simultaneous contacts we ever report. */
 #define MAX_CONTACTS     5
@@ -130,8 +130,11 @@ static int32_t pinch_offset;
 static int32_t cluster_x;
 static int32_t cluster_y;
 
-/** True if we lifted the virtual fingers last tick to wrap around the touchpad. */
-static bool pending_wrap;
+/** Timestamp of the last non-zero trackball movement (ms). */
+static uint32_t last_movement_time;
+
+/** True if the virtual fingers are currently lifted due to inactivity. */
+static bool fingers_lifted_idle;
 
 /* ================================================================== */
 /* Helpers                                                             */
@@ -159,29 +162,6 @@ static int contacts_for_mode(enum gesture_mode mode)
     case GESTURE_PINCH5: return 5;
     default:             return 0;
     }
-}
-
-/**
- * Determine whether any contact in a cluster centred at (cx, cy) with
- * the given number of contacts (spread horizontally by FINGER_SPACING)
- * is too close to a touchpad edge.
- *
- * @return true if a wrap / reset to centre is needed.
- */
-static bool cluster_near_edge(int32_t cx, int32_t cy, int num_contacts)
-{
-    /* Compute the leftmost and rightmost contact positions. */
-    int32_t half_span = (int32_t)(num_contacts - 1) * FINGER_SPACING / 2;
-    int32_t x_min = cx - half_span;
-    int32_t x_max = cx + half_span;
-
-    if (x_min < EDGE_WRAP_MARGIN || x_max > (TP_MAX - EDGE_WRAP_MARGIN)) {
-        return true;
-    }
-    if (cy < EDGE_WRAP_MARGIN || cy > (TP_MAX - EDGE_WRAP_MARGIN)) {
-        return true;
-    }
-    return false;
 }
 
 /* ================================================================== */
@@ -302,36 +282,6 @@ static void send_gesture_report(bool fingers_down)
 }
 
 /* ================================================================== */
-/* Swipe edge-wrapping                                                 */
-/* ================================================================== */
-
-/**
- * If the finger cluster has drifted near a touchpad edge, perform a
- * quick lift → re-place at centre sequence so the gesture can continue
- * indefinitely.
- *
- * @return true if a wrap occurred (the caller should skip the normal
- *         report for this tick).
- */
-static bool maybe_wrap_swipe(int num_contacts)
-{
-    int32_t cx = TP_CENTER + cluster_x;
-    int32_t cy = TP_CENTER + cluster_y;
-
-    if (!cluster_near_edge(cx, cy, num_contacts)) {
-        return false;
-    }
-
-    LOG_DBG("swipe%d: edge wrap triggered", num_contacts);
-
-    /* Lift all fingers. We will place them back down on the next tick. */
-    send_gesture_report(false);
-    pending_wrap = true;
-
-    return true;
-}
-
-/* ================================================================== */
 /* Timer callback                                                      */
 /* ================================================================== */
 
@@ -350,15 +300,6 @@ static void gesture_work_handler(struct k_work *work)
         return;
     }
 
-    /* If we lifted the fingers last tick to wrap, place them back at the centre now. */
-    if (pending_wrap) {
-        cluster_x = 0;
-        cluster_y = 0;
-        pending_wrap = false;
-        send_gesture_report(true);
-        return;
-    }
-
     /* ---- Atomically consume the accumulated deltas ---- */
     int32_t dx, dy;
     {
@@ -368,6 +309,25 @@ static void gesture_work_handler(struct k_work *work)
         accumulated_dx = 0;
         accumulated_dy = 0;
         k_spin_unlock(&delta_lock, key);
+    }
+
+    if (dx != 0 || dy != 0) {
+        last_movement_time = k_uptime_get_32();
+        if (fingers_lifted_idle) {
+            cluster_x = 0;
+            cluster_y = 0;
+            fingers_lifted_idle = false;
+        }
+    } else {
+        if (!fingers_lifted_idle && (k_uptime_get_32() - last_movement_time > CONFIG_ZMK_TRACKBALL_GESTURES_IDLE_TIMEOUT_MS)) {
+            fingers_lifted_idle = true;
+            send_gesture_report(false);
+            return;
+        }
+    }
+
+    if (fingers_lifted_idle) {
+        return;
     }
 
     /* ---- Apply deltas to gesture-specific state ---- */
@@ -395,9 +355,7 @@ static void gesture_work_handler(struct k_work *work)
         cluster_x += dx;
         cluster_y += dy;
 
-        if (maybe_wrap_swipe(nc)) {
-            return;
-        }
+        /* No edge wrapping! Infinite logical bounds handles it naturally. */
 
         /* Clamp to keep the widest contact inside bounds. */
         int32_t half_span = (int32_t)(nc - 1) * FINGER_SPACING / 2;
@@ -465,7 +423,8 @@ void gesture_mode_activate(enum gesture_mode mode)
     pinch_offset = CONFIG_ZMK_TRACKBALL_GESTURES_PINCH_BASE_DISTANCE;
     cluster_x = 0;
     cluster_y = 0;
-    pending_wrap = false;
+    last_movement_time = k_uptime_get_32();
+    fingers_lifted_idle = false;
 
     gesture_active = true;
 

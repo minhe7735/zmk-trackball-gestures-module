@@ -37,29 +37,44 @@ config ZMK_TRACKBALL_GESTURES_REPORT_RATE_MS
       more USB bandwidth. Higher values (e.g. 16 ms = 62.5 Hz) reduce
       bandwidth usage at the cost of gesture fluidity.
 
-config ZMK_TRACKBALL_GESTURES_TOUCHPAD_WIDTH
-    int "Logical touchpad width (X maximum)"
-    default 4095
+config ZMK_TRACKBALL_GESTURES_IDLE_TIMEOUT_MS
+    int "Idle timeout before fingers lift (ms)"
+    default 100
+    range 0 5000
     help
-      The logical maximum X coordinate of the emulated touchpad surface.
-      This value is reported in the HID descriptor and defines the
-      horizontal resolution of the virtual touchpad. The default of 4095
-      provides 12-bit resolution, matching common precision touchpad
-      implementations.
+      The time in milliseconds the trackball must remain idle before the
+      virtual fingers are lifted from the trackpad surface. This acts as
+      an auto-centering mechanism: when you pause for this long, the fingers
+      lift, and the next movement will place them back down in the center
+      of the virtual trackpad. Lower values re-center faster, while higher
+      values are more forgiving of micro-pauses during slow dragging.
 
-config ZMK_TRACKBALL_GESTURES_TOUCHPAD_HEIGHT
-    int "Logical touchpad height (Y maximum)"
-    default 4095
+config ZMK_TRACKBALL_GESTURES_TP_LOGICAL_MAX
+    int "Logical touchpad size (X/Y maximum)"
+    default 32767
+    range 100 65535
     help
-      The logical maximum Y coordinate of the emulated touchpad surface.
+      The logical maximum coordinate of the emulated touchpad surface.
       This value is reported in the HID descriptor and defines the
-      vertical resolution of the virtual touchpad. The default of 4095
-      provides 12-bit resolution, matching common precision touchpad
-      implementations.
+      resolution of the virtual touchpad. A value of 32767 effectively
+      provides an infinite scrolling surface, eliminating the need for
+      edge wrapping.
+
+config ZMK_TRACKBALL_GESTURES_TP_PHYSICAL_MAX
+    int "Physical touchpad size (X/Y maximum in 100ths of an inch)"
+    default 3200
+    range 100 65535
+    help
+      The physical size of the emulated touchpad, reported in the HID
+      descriptor. This dictates how the host OS scales swipe distances.
+      If you change the logical maximum, you should proportionally change
+      this value to maintain the same scrolling speed and kinetic
+      acceleration curves. 3200 equals 32 inches.
 
 config ZMK_TRACKBALL_GESTURES_SENSITIVITY
     int "Trackball delta multiplier"
     default 10
+    range 1 500
     help
       Multiplier applied to raw trackball delta values when translating
       them into touchpad finger movements. Higher values make gestures
@@ -70,6 +85,7 @@ config ZMK_TRACKBALL_GESTURES_SENSITIVITY
 config ZMK_TRACKBALL_GESTURES_PINCH_BASE_DISTANCE
     int "Initial distance between pinch fingers (logical units)"
     default 800
+    range 1 32767
     help
       The initial distance in logical touchpad units between the two
       virtual fingers when a pinch gesture begins. Trackball movement
@@ -79,7 +95,8 @@ config ZMK_TRACKBALL_GESTURES_PINCH_BASE_DISTANCE
 
 config ZMK_TRACKBALL_GESTURES_FINGER_SPACING
     int "Spacing between multi-finger swipe contacts (logical units)"
-    default 200
+    default 800
+    range 1 32767
     help
       The distance in logical touchpad units between adjacent virtual
       finger contacts during multi-finger swipe gestures. This spacing

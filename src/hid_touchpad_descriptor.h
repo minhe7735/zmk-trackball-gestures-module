@@ -19,192 +19,211 @@
 #define TOUCHPAD_FEATURE_PTPHQA_ID            0x03
 #define TOUCHPAD_FEATURE_CONFIG_ID            0x04
 #define TOUCHPAD_FEATURE_FUNCTION_SWITCH_ID   0x05
+#define TOUCHPAD_MOUSE_REPORT_ID              0x06
+
+/* Byte extraction macros for Kconfig parameters */
+#define HID_LSB_16(x) ((x) & 0xFF)
+#define HID_MSB_16(x) (((x) >> 8) & 0xFF)
 
 /*
  * Per-finger logical collection descriptor fragment.
  * Each finger reports: confidence (1 bit), tip switch (1 bit),
- * contact ID (4 bits), padding (2 bits), X (16 bits), Y (16 bits).
+ * padding (6 bits), contact ID (8 bits), X (16 bits), Y (16 bits).
+ * To match the MS Sample Descriptor format.
  */
 #define TOUCHPAD_FINGER_COLLECTION                                             \
-    0xA1, 0x02,             /* Collection (Logical)                         */ \
-    0x09, 0x42,             /*   Usage (Tip Switch)                         */ \
-    0x09, 0x47,             /*   Usage (Confidence)                         */ \
-    0x15, 0x00,             /*   Logical Minimum (0)                        */ \
-    0x25, 0x01,             /*   Logical Maximum (1)                        */ \
-    0x75, 0x01,             /*   Report Size (1)                            */ \
-    0x95, 0x02,             /*   Report Count (2)                           */ \
-    0x81, 0x02,             /*   Input (Data, Variable, Absolute)           */ \
-    0x09, 0x51,             /*   Usage (Contact Identifier)                 */ \
-    0x25, 0x0F,             /*   Logical Maximum (15)                       */ \
-    0x75, 0x04,             /*   Report Size (4)                            */ \
-    0x95, 0x01,             /*   Report Count (1)                           */ \
-    0x81, 0x02,             /*   Input (Data, Variable, Absolute)           */ \
-    0x75, 0x02,             /*   Report Size (2)                            */ \
-    0x95, 0x01,             /*   Report Count (1)                           */ \
-    0x81, 0x03,             /*   Input (Constant, Variable, Absolute)       */ \
-    0x05, 0x01,             /*   Usage Page (Generic Desktop)               */ \
-    0x09, 0x30,             /*   Usage (X)                                  */ \
-    0x15, 0x00,             /*   Logical Minimum (0)                        */ \
-    0x26, 0xFF, 0x0F,       /*   Logical Maximum (4095)                     */ \
-    0x35, 0x00,             /*   Physical Minimum (0)                       */ \
-    0x46, 0x90, 0x01,       /*   Physical Maximum (400)                     */ \
-    0x55, 0x0E,             /*   Unit Exponent (-2)                         */ \
-    0x65, 0x13,             /*   Unit (Inch, English Linear)                */ \
-    0x75, 0x10,             /*   Report Size (16)                           */ \
-    0x95, 0x01,             /*   Report Count (1)                           */ \
-    0x81, 0x02,             /*   Input (Data, Variable, Absolute)           */ \
-    0x09, 0x31,             /*   Usage (Y)                                  */ \
-    0x46, 0x13, 0x01,       /*   Physical Maximum (275)                     */ \
-    0x81, 0x02,             /*   Input (Data, Variable, Absolute)           */ \
-    0xC0                    /* End Collection (Logical)                     */
+    0xA1, 0x02,             /* COLLECTION (Logical)                         */ \
+    0x15, 0x00,             /*   LOGICAL_MINIMUM (0)                        */ \
+    0x25, 0x01,             /*   LOGICAL_MAXIMUM (1)                        */ \
+    0x35, 0x00,             /*   PHYSICAL_MINIMUM (0)                       */ \
+    0x45, 0x00,             /*   PHYSICAL_MAXIMUM (0)                       */ \
+    0x55, 0x00,             /*   UNIT_EXPONENT (0)                          */ \
+    0x65, 0x00,             /*   UNIT (None)                                */ \
+    0x09, 0x47,             /*   USAGE (Confidence)                         */ \
+    0x09, 0x42,             /*   USAGE (Tip Switch)                         */ \
+    0x95, 0x02,             /*   REPORT_COUNT (2)                           */ \
+    0x75, 0x01,             /*   REPORT_SIZE (1)                            */ \
+    0x81, 0x02,             /*   INPUT (Data,Var,Abs)                       */ \
+    0x95, 0x01,             /*   REPORT_COUNT (1)                           */ \
+    0x75, 0x06,             /*   REPORT_SIZE (6)                            */ \
+    0x81, 0x03,             /*   INPUT (Cnst,Var,Abs)                       */ \
+    0x75, 0x08,             /*   REPORT_SIZE (8)                            */ \
+    0x25, 0x0F,             /*   LOGICAL_MAXIMUM (15)                       */ \
+    0x09, 0x51,             /*   USAGE (Contact Identifier)                 */ \
+    0x81, 0x02,             /*   INPUT (Data,Var,Abs)                       */ \
+    0x05, 0x01,             /*   USAGE_PAGE (Generic Desktop)               */ \
+    0x15, 0x00,             /*   LOGICAL_MINIMUM (0)                        */ \
+    0x26, HID_LSB_16(CONFIG_ZMK_TRACKBALL_GESTURES_TP_LOGICAL_MAX), HID_MSB_16(CONFIG_ZMK_TRACKBALL_GESTURES_TP_LOGICAL_MAX), /*   LOGICAL_MAXIMUM */ \
+    0x75, 0x10,             /*   REPORT_SIZE (16)                           */ \
+    0x55, 0x0E,             /*   UNIT_EXPONENT (-2)                         */ \
+    0x65, 0x13,             /*   UNIT (Inch, English Linear)                */ \
+    0x09, 0x30,             /*   USAGE (X)                                  */ \
+    0x35, 0x00,             /*   PHYSICAL_MINIMUM (0)                       */ \
+    0x46, HID_LSB_16(CONFIG_ZMK_TRACKBALL_GESTURES_TP_PHYSICAL_MAX), HID_MSB_16(CONFIG_ZMK_TRACKBALL_GESTURES_TP_PHYSICAL_MAX), /*   PHYSICAL_MAXIMUM */ \
+    0x95, 0x01,             /*   REPORT_COUNT (1)                           */ \
+    0x81, 0x02,             /*   INPUT (Data,Var,Abs)                       */ \
+    0x46, HID_LSB_16(CONFIG_ZMK_TRACKBALL_GESTURES_TP_PHYSICAL_MAX), HID_MSB_16(CONFIG_ZMK_TRACKBALL_GESTURES_TP_PHYSICAL_MAX), /*   PHYSICAL_MAXIMUM */ \
+    0x09, 0x31,             /*   USAGE (Y)                                  */ \
+    0x81, 0x02,             /*   INPUT (Data,Var,Abs)                       */ \
+    0xC0                    /* END_COLLECTION                               */
 
 /*
  * Full Windows Precision Touchpad HID Report Descriptor.
- *
- * Structure:
- *   TLC 1 — Touch Pad (Usage Page 0x0D, Usage 0x05)
- *     - 5x finger collections (input report, ID 0x01)
- *     - Scan Time, Contact Count, Button
- *     - Feature: Max Contact Count + Pad Type (ID 0x02)
- *     - Feature: PTPHQA certification blob (ID 0x03)
- *   TLC 2 — Configuration (Usage Page 0x0D, Usage 0x0E)
- *     - Feature: Input Mode (ID 0x04)
- *     - Feature: Function Switch (Surface Switch + Button Switch, ID 0x05)
+ * Matches Microsoft PTP Sample Descriptor structure carefully.
  */
 #define TOUCHPAD_HID_REPORT_DESC                                               \
     /* ============================================================== */       \
     /* TLC 1: Touch Pad                                               */       \
     /* ============================================================== */       \
-    0x05, 0x0D,             /* Usage Page (Digitizer)                       */ \
-    0x09, 0x05,             /* Usage (Touch Pad)                            */ \
-    0xA1, 0x01,             /* Collection (Application)                     */ \
-    0x85, TOUCHPAD_REPORT_ID, /* Report ID (0x01)                           */ \
+    0x05, 0x0D,             /* USAGE_PAGE (Digitizer)                       */ \
+    0x09, 0x05,             /* USAGE (Touch Pad)                            */ \
+    0xA1, 0x01,             /* COLLECTION (Application)                     */ \
+    0x85, TOUCHPAD_REPORT_ID, /* REPORT_ID (0x01)                           */ \
                                                                                \
     /* ----- Finger 1 ----- */                                                 \
-    0x05, 0x0D,             /* Usage Page (Digitizer)                       */ \
-    0x09, 0x22,             /* Usage (Finger)                               */ \
+    0x05, 0x0D,             /* USAGE_PAGE (Digitizer)                       */ \
+    0x09, 0x22,             /* USAGE (Finger)                               */ \
     TOUCHPAD_FINGER_COLLECTION,                                                \
                                                                                \
     /* ----- Finger 2 ----- */                                                 \
-    0x05, 0x0D,             /* Usage Page (Digitizer)                       */ \
-    0x09, 0x22,             /* Usage (Finger)                               */ \
+    0x05, 0x0D,             /* USAGE_PAGE (Digitizer)                       */ \
+    0x09, 0x22,             /* USAGE (Finger)                               */ \
     TOUCHPAD_FINGER_COLLECTION,                                                \
                                                                                \
     /* ----- Finger 3 ----- */                                                 \
-    0x05, 0x0D,             /* Usage Page (Digitizer)                       */ \
-    0x09, 0x22,             /* Usage (Finger)                               */ \
+    0x05, 0x0D,             /* USAGE_PAGE (Digitizer)                       */ \
+    0x09, 0x22,             /* USAGE (Finger)                               */ \
     TOUCHPAD_FINGER_COLLECTION,                                                \
                                                                                \
     /* ----- Finger 4 ----- */                                                 \
-    0x05, 0x0D,             /* Usage Page (Digitizer)                       */ \
-    0x09, 0x22,             /* Usage (Finger)                               */ \
+    0x05, 0x0D,             /* USAGE_PAGE (Digitizer)                       */ \
+    0x09, 0x22,             /* USAGE (Finger)                               */ \
     TOUCHPAD_FINGER_COLLECTION,                                                \
                                                                                \
     /* ----- Finger 5 ----- */                                                 \
-    0x05, 0x0D,             /* Usage Page (Digitizer)                       */ \
-    0x09, 0x22,             /* Usage (Finger)                               */ \
+    0x05, 0x0D,             /* USAGE_PAGE (Digitizer)                       */ \
+    0x09, 0x22,             /* USAGE (Finger)                               */ \
     TOUCHPAD_FINGER_COLLECTION,                                                \
                                                                                \
     /* ----- Scan Time (16 bits) ----- */                                      \
-    0x05, 0x0D,             /* Usage Page (Digitizer)                       */ \
-    0x09, 0x56,             /* Usage (Scan Time)                            */ \
-    0x15, 0x00,             /* Logical Minimum (0)                          */ \
-    0x26, 0xFF, 0xFF,       /* Logical Maximum (65535)                      */ \
-    0x35, 0x00,             /* Physical Minimum (0)                         */ \
-    0x46, 0xFF, 0xFF,       /* Physical Maximum (65535)                     */ \
-    0x55, 0x0C,             /* Unit Exponent (-4)                           */ \
-    0x66, 0x01, 0x10,       /* Unit (Seconds, SI Linear)                    */ \
-    0x75, 0x10,             /* Report Size (16)                             */ \
-    0x95, 0x01,             /* Report Count (1)                             */ \
-    0x81, 0x02,             /* Input (Data, Variable, Absolute)             */ \
+    0x55, 0x0C,             /* UNIT_EXPONENT (-4)                           */ \
+    0x66, 0x01, 0x10,       /* UNIT (Seconds)                               */ \
+    0x47, 0xFF, 0xFF, 0x00, 0x00, /* PHYSICAL_MAXIMUM (65535)               */ \
+    0x27, 0xFF, 0xFF, 0x00, 0x00, /* LOGICAL_MAXIMUM (65535)                */ \
+    0x75, 0x10,             /* REPORT_SIZE (16)                             */ \
+    0x95, 0x01,             /* REPORT_COUNT (1)                             */ \
+    0x05, 0x0D,             /* USAGE_PAGE (Digitizer)                       */ \
+    0x09, 0x56,             /* USAGE (Scan Time)                            */ \
+    0x81, 0x02,             /* INPUT (Data,Var,Abs)                         */ \
                                                                                \
     /* ----- Contact Count (8 bits) ----- */                                   \
-    0x09, 0x54,             /* Usage (Contact Count)                        */ \
-    0x15, 0x00,             /* Logical Minimum (0)                          */ \
-    0x25, 0x7F,             /* Logical Maximum (127)                        */ \
-    0x35, 0x00,             /* Physical Minimum (0)                         */ \
-    0x45, 0x00,             /* Physical Maximum (0)  — reset                */ \
-    0x55, 0x00,             /* Unit Exponent (0)     — reset                */ \
-    0x65, 0x00,             /* Unit (None)           — reset                */ \
-    0x75, 0x08,             /* Report Size (8)                              */ \
-    0x95, 0x01,             /* Report Count (1)                             */ \
-    0x81, 0x02,             /* Input (Data, Variable, Absolute)             */ \
+    0x09, 0x54,             /* USAGE (Contact Count)                        */ \
+    0x25, 0x7F,             /* LOGICAL_MAXIMUM (127)                        */ \
+    0x35, 0x00,             /* PHYSICAL_MINIMUM (0)                         */ \
+    0x45, 0x00,             /* PHYSICAL_MAXIMUM (0)                         */ \
+    0x55, 0x00,             /* UNIT_EXPONENT (0)                            */ \
+    0x65, 0x00,             /* UNIT (None)                                  */ \
+    0x95, 0x01,             /* REPORT_COUNT (1)                             */ \
+    0x75, 0x08,             /* REPORT_SIZE (8)                              */ \
+    0x81, 0x02,             /* INPUT (Data,Var,Abs)                         */ \
                                                                                \
     /* ----- Button (1 bit + 7 padding) ----- */                               \
-    0x05, 0x09,             /* Usage Page (Button)                          */ \
-    0x09, 0x01,             /* Usage (Button 1)                             */ \
-    0x15, 0x00,             /* Logical Minimum (0)                          */ \
-    0x25, 0x01,             /* Logical Maximum (1)                          */ \
-    0x75, 0x01,             /* Report Size (1)                              */ \
-    0x95, 0x01,             /* Report Count (1)                             */ \
-    0x81, 0x02,             /* Input (Data, Variable, Absolute)             */ \
-    0x75, 0x07,             /* Report Size (7)                              */ \
-    0x95, 0x01,             /* Report Count (1)                             */ \
-    0x81, 0x03,             /* Input (Constant, Variable, Absolute)         */ \
-                                                                               \
-    /* ----- Feature: Max Contact Count + Pad Type (ID 0x02) ----- */          \
-    0x85, TOUCHPAD_FEATURE_MAX_COUNT_ID, /* Report ID (0x02)                */ \
-    0x05, 0x0D,             /* Usage Page (Digitizer)                       */ \
-    0x09, 0x55,             /* Usage (Contact Count Maximum)                */ \
-    0x15, 0x00,             /* Logical Minimum (0)                          */ \
-    0x25, 0x0F,             /* Logical Maximum (15)                         */ \
-    0x75, 0x04,             /* Report Size (4)                              */ \
-    0x95, 0x01,             /* Report Count (1)                             */ \
-    0xB1, 0x02,             /* Feature (Data, Variable, Absolute)           */ \
-    0x09, 0x59,             /* Usage (Pad Type)                             */ \
-    0x25, 0x0F,             /* Logical Maximum (15)                         */ \
-    0x75, 0x04,             /* Report Size (4)                              */ \
-    0x95, 0x01,             /* Report Count (1)                             */ \
-    0xB1, 0x02,             /* Feature (Data, Variable, Absolute)           */ \
-                                                                               \
-    /* ----- Feature: PTPHQA Certification Blob (ID 0x03) ----- */             \
-    0x85, TOUCHPAD_FEATURE_PTPHQA_ID, /* Report ID (0x03)                   */ \
-    0x06, 0x00, 0xFF,       /* Usage Page (Vendor Defined 0xFF00)           */ \
-    0x09, 0xC5,             /* Usage (Vendor Usage 0xC5)                    */ \
-    0x15, 0x00,             /* Logical Minimum (0)                          */ \
-    0x26, 0xFF, 0x00,       /* Logical Maximum (255)                        */ \
-    0x75, 0x08,             /* Report Size (8)                              */ \
-    0x96, 0x00, 0x01,       /* Report Count (256)                           */ \
-    0xB1, 0x02,             /* Feature (Data, Variable, Absolute)           */ \
-                                                                               \
-    0xC0,                   /* End Collection (Application — TLC 1)         */ \
+    0x05, 0x09,             /* USAGE_PAGE (Button)                          */ \
+    0x09, 0x01,             /* USAGE (Button 1)                             */ \
+    0x25, 0x01,             /* LOGICAL_MAXIMUM (1)                          */ \
+    0x75, 0x01,             /* REPORT_SIZE (1)                              */ \
+    0x95, 0x01,             /* REPORT_COUNT (1)                             */ \
+    0x81, 0x02,             /* INPUT (Data,Var,Abs)                         */ \
+    0x95, 0x07,             /* REPORT_COUNT (7)                             */ \
+    0x81, 0x03,             /* INPUT (Cnst,Var,Abs)                         */ \
+    /* ----- Feature: Max Contact Count + Pad Type ----- */                    \
+    0x05, 0x0D,             /* USAGE_PAGE (Digitizer)                       */ \
+    0x85, TOUCHPAD_FEATURE_MAX_COUNT_ID, /* REPORT_ID                       */ \
+    0x09, 0x55,             /* USAGE (Contact Count Maximum)                */ \
+    0x09, 0x59,             /* USAGE (Pad Type)                             */ \
+    0x75, 0x04,             /* REPORT_SIZE (4)                              */ \
+    0x95, 0x02,             /* REPORT_COUNT (2)                             */ \
+    0x25, 0x0F,             /* LOGICAL_MAXIMUM (15)                         */ \
+    0xB1, 0x02,             /* FEATURE (Data,Var,Abs)                       */ \
                                                                                \
     /* ============================================================== */       \
-    /* TLC 2: Configuration                                           */       \
+    /* PTPHQA Certification Blob (Still inside TLC 1)                 */       \
     /* ============================================================== */       \
-    0x05, 0x0D,             /* Usage Page (Digitizer)                       */ \
-    0x09, 0x0E,             /* Usage (Configuration)                        */ \
-    0xA1, 0x01,             /* Collection (Application)                     */ \
+    0x06, 0x00, 0xFF,       /* USAGE_PAGE (Vendor Defined)                  */ \
+    0x85, TOUCHPAD_FEATURE_PTPHQA_ID, /* REPORT_ID                          */ \
+    0x09, 0xC5,             /* USAGE (Vendor Usage 0xC5)                    */ \
+    0x15, 0x00,             /* LOGICAL_MINIMUM (0)                          */ \
+    0x26, 0xFF, 0x00,       /* LOGICAL_MAXIMUM (255)                        */ \
+    0x75, 0x08,             /* REPORT_SIZE (8)                              */ \
+    0x96, 0x00, 0x01,       /* REPORT_COUNT (256)                           */ \
+    0xB1, 0x02,             /* FEATURE (Data,Var,Abs)                       */ \
+    0xC0,                   /* END_COLLECTION (TLC 1)                       */ \
                                                                                \
-    /* ----- Feature: Input Mode (ID 0x04) ----- */                            \
-    0x85, TOUCHPAD_FEATURE_CONFIG_ID, /* Report ID (0x04)                   */ \
-    0x09, 0x22,             /* Usage (Finger)                               */ \
-    0xA1, 0x02,             /* Collection (Logical)                         */ \
-    0x09, 0x52,             /* Usage (Input Mode)                           */ \
-    0x15, 0x00,             /* Logical Minimum (0)                          */ \
-    0x25, 0x0A,             /* Logical Maximum (10)                         */ \
-    0x75, 0x08,             /* Report Size (8)                              */ \
-    0x95, 0x01,             /* Report Count (1)                             */ \
-    0xB1, 0x02,             /* Feature (Data, Variable, Absolute)           */ \
-    0xC0,                   /* End Collection (Logical)                     */ \
+    /* ============================================================== */       \
+    /* TLC 2: Device Configuration (Features)                         */       \
+    /* ============================================================== */       \
+    0x05, 0x0D,             /* USAGE_PAGE (Digitizer)                       */ \
+    0x09, 0x0E,             /* USAGE (Device Configuration)                 */ \
+    0xA1, 0x01,             /* COLLECTION (Application)                     */ \
                                                                                \
-    /* ----- Feature: Function Switch (ID 0x05) ----- */                       \
-    0x85, TOUCHPAD_FEATURE_FUNCTION_SWITCH_ID, /* Report ID (0x05)          */ \
-    0x09, 0x22,             /* Usage (Finger)                               */ \
-    0xA1, 0x02,             /* Collection (Logical)                         */ \
-    0x09, 0x57,             /* Usage (Surface Switch)                       */ \
-    0x09, 0x58,             /* Usage (Button Switch)                        */ \
-    0x15, 0x00,             /* Logical Minimum (0)                          */ \
-    0x25, 0x01,             /* Logical Maximum (1)                          */ \
-    0x75, 0x01,             /* Report Size (1)                              */ \
-    0x95, 0x02,             /* Report Count (2)                             */ \
-    0xB1, 0x02,             /* Feature (Data, Variable, Absolute)           */ \
-    0x75, 0x06,             /* Report Size (6)                              */ \
-    0x95, 0x01,             /* Report Count (1)                             */ \
-    0xB1, 0x03,             /* Feature (Constant, Variable, Absolute)       */ \
-    0xC0,                   /* End Collection (Logical)                     */ \
+    /* ----- Feature: Input Mode ----- */                                      \
+    0x85, TOUCHPAD_FEATURE_CONFIG_ID,    /* REPORT_ID                       */ \
+    0x09, 0x22,             /* USAGE (Finger)                               */ \
+    0xA1, 0x02,             /* COLLECTION (Logical)                         */ \
+    0x09, 0x52,             /* USAGE (Input Mode)                           */ \
+    0x09, 0x53,             /* USAGE (Device Index)                         */ \
+    0x15, 0x00,             /* LOGICAL_MINIMUM (0)                          */ \
+    0x25, 0x0A,             /* LOGICAL_MAXIMUM (10)                         */ \
+    0x75, 0x08,             /* REPORT_SIZE (8)                              */ \
+    0x95, 0x02,             /* REPORT_COUNT (2)                             */ \
+    0xB1, 0x02,             /* FEATURE (Data,Var,Abs)                       */ \
+    0xC0,                   /* END_COLLECTION                               */ \
                                                                                \
-    0xC0                    /* End Collection (Application — TLC 2)         */
+    /* ----- Feature: Function Switch ----- */                                 \
+    0x09, 0x22,             /* USAGE (Finger)                               */ \
+    0xA1, 0x00,             /* COLLECTION (Physical)                        */ \
+    0x85, TOUCHPAD_FEATURE_FUNCTION_SWITCH_ID, /* REPORT_ID                 */ \
+    0x09, 0x57,             /* USAGE (Surface Switch)                       */ \
+    0x09, 0x58,             /* USAGE (Button Switch)                        */ \
+    0x75, 0x01,             /* REPORT_SIZE (1)                              */ \
+    0x95, 0x02,             /* REPORT_COUNT (2)                             */ \
+    0x25, 0x01,             /* LOGICAL_MAXIMUM (1)                          */ \
+    0xB1, 0x02,             /* FEATURE (Data,Var,Abs)                       */ \
+    0x95, 0x06,             /* REPORT_COUNT (6)                             */ \
+    0xB1, 0x03,             /* FEATURE (Cnst,Var,Abs)                       */ \
+    0xC0,                   /* END_COLLECTION                               */ \
+    0xC0,                   /* END_COLLECTION (TLC 2)                       */ \
+                                                                               \
+    /* ============================================================== */       \
+    /* TLC 4: Mouse Collection (Required for Default Compatibility)   */       \
+    /* ============================================================== */       \
+    0x05, 0x01,             /* USAGE_PAGE (Generic Desktop)                 */ \
+    0x09, 0x02,             /* USAGE (Mouse)                                */ \
+    0xA1, 0x01,             /* COLLECTION (Application)                     */ \
+    0x85, TOUCHPAD_MOUSE_REPORT_ID, /* REPORT_ID (0x06)                     */ \
+    0x09, 0x01,             /* USAGE (Pointer)                              */ \
+    0xA1, 0x00,             /* COLLECTION (Physical)                        */ \
+    /* ----- Buttons ----- */                                                  \
+    0x05, 0x09,             /*   USAGE_PAGE (Button)                        */ \
+    0x19, 0x01,             /*   USAGE_MINIMUM (Button 1)                   */ \
+    0x29, 0x02,             /*   USAGE_MAXIMUM (Button 2)                   */ \
+    0x25, 0x01,             /*   LOGICAL_MAXIMUM (1)                        */ \
+    0x75, 0x01,             /*   REPORT_SIZE (1)                            */ \
+    0x95, 0x02,             /*   REPORT_COUNT (2)                           */ \
+    0x81, 0x02,             /*   INPUT (Data,Var,Abs)                       */ \
+    0x95, 0x06,             /*   REPORT_COUNT (6)                           */ \
+    0x81, 0x03,             /*   INPUT (Cnst,Var,Abs)                       */ \
+    /* ----- X/Y Movement ----- */                                             \
+    0x05, 0x01,             /*   USAGE_PAGE (Generic Desktop)               */ \
+    0x09, 0x30,             /*   USAGE (X)                                  */ \
+    0x09, 0x31,             /*   USAGE (Y)                                  */ \
+    0x75, 0x10,             /*   REPORT_SIZE (16)                           */ \
+    0x95, 0x02,             /*   REPORT_COUNT (2)                           */ \
+    0x16, 0x01, 0x80,       /*   LOGICAL_MINIMUM (-32767)                   */ \
+    0x26, 0xFF, 0x7F,       /*   LOGICAL_MAXIMUM (32767)                    */ \
+    0x81, 0x06,             /*   INPUT (Data,Var,Rel)                       */ \
+    0xC0,                   /* END_COLLECTION                               */ \
+    0xC0                    /* END_COLLECTION (TLC 4)                       */
 
 /* ------------------------------------------------------------------ */
 /* Report data structures (packed, matching the descriptor layout)     */
@@ -212,24 +231,16 @@
 
 /**
  * Per-finger contact in the input report.
- *
- * Bit layout of `flags`:
- *   Bit 0    : Tip Switch  (1 = finger touching)
- *   Bit 1    : Confidence  (1 = valid contact)
- *   Bits 2-5 : Contact Identifier (0-15)
- *   Bits 6-7 : Padding (0)
  */
 struct touchpad_contact_report {
-    uint8_t flags;
+    uint8_t flags; /* Bit 0: Confidence, Bit 1: Tip Switch, Bits 2-7: padding */
+    uint8_t contact_id;
     uint16_t x;
     uint16_t y;
 } __packed;
 
 /**
  * Full touchpad input report (Report ID 0x01).
- *
- * Total size: 1 (report ID) + 5×5 (contacts) + 2 (scan time)
- *             + 1 (contact count) + 1 (buttons) = 30 bytes.
  */
 struct touchpad_input_report {
     uint8_t report_id;
@@ -241,14 +252,20 @@ struct touchpad_input_report {
 
 /**
  * Feature report: Maximum Contact Count + Pad Type (Report ID 0x02).
- *
- * Bit layout of `max_count_and_pad_type`:
- *   Bits 0-3 : Maximum Contact Count (5)
- *   Bits 4-7 : Pad Type (0 = depressible click-pad)
  */
 struct touchpad_feature_max_count {
     uint8_t report_id;
-    uint8_t max_count_and_pad_type;
+    uint8_t max_count : 4;
+    uint8_t pad_type  : 4;
+} __packed;
+
+/**
+ * Feature report: Input Mode (Report ID 0x04).
+ */
+struct touchpad_feature_input_mode {
+    uint8_t report_id;
+    uint8_t input_mode;
+    uint8_t device_index;
 } __packed;
 
 #endif /* HID_TOUCHPAD_DESCRIPTOR_H */
