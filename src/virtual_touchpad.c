@@ -340,14 +340,16 @@ int virtual_touchpad_send_report(const struct touchpad_report *report)
      * get the exact same scan time, which confuses some OS drivers. */
     static uint32_t last_scan_time = 0;
     uint32_t current_scan = k_uptime_get_32() * 10;
-    if (current_scan <= last_scan_time) {
-        current_scan = last_scan_time + 10; /* force +1ms */
+    if (current_scan == last_scan_time) {
+        current_scan += 10; /* force +1ms */
     }
     last_scan_time = current_scan;
     hid_report->scan_time = (uint16_t)(current_scan & 0xFFFF);
 
     hid_report->contact_count = report->contact_count;
     hid_report->buttons = report->button ? 0x01 : 0x00;
+
+    k_spin_unlock(&send_lock, key);
 
     /* Transmit on the interrupt-IN endpoint.  Skip the report_id byte
      * if the USB HID stack adds it automatically; Zephyr's stack
@@ -356,8 +358,6 @@ int virtual_touchpad_send_report(const struct touchpad_report *report)
                                (const uint8_t *)hid_report,
                                sizeof(*hid_report),
                                NULL);
-
-    k_spin_unlock(&send_lock, key);
 
     if (ret) {
         LOG_WRN("hid_int_ep_write failed: %d", ret);

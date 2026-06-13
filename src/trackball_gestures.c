@@ -272,10 +272,6 @@ static void send_gesture_report(bool active)
     struct touchpad_report report;
     bool fingers_down = active;
 
-    if (active) {
-        // Normal behavior: hold as long as physical key is held.
-    }
-
     memset(&report, 0, sizeof(report));
 
     switch (current_mode) {
@@ -408,8 +404,6 @@ static void gesture_work_handler(struct k_work *work)
 
         break;
     }
-
-
 
     default:
         return;
