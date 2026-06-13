@@ -27,6 +27,7 @@ enum gesture_mode {
     GESTURE_PINCH3 = 6,  /**< Three-finger pinch                          */
     GESTURE_PINCH4 = 7,  /**< Four-finger pinch                           */
     GESTURE_PINCH5 = 8,  /**< Five-finger pinch                           */
+
 };
 
 /**

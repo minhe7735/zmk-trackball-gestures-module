@@ -44,6 +44,9 @@ static const struct device *hid_dev;
 /** True once the HID interface has been successfully initialized. */
 static bool touchpad_ready;
 
+/** Spinlock for thread-safe report sending. */
+static struct k_spinlock send_lock;
+
 /** Current input mode set by the host (0 = Mouse, 3 = Touchpad). */
 static uint8_t current_input_mode = 0;
 
@@ -288,57 +291,74 @@ int virtual_touchpad_send_report(const struct touchpad_report *report)
         return -ENODEV;
     }
 
-    /* Build the packed HID input report.
-     * Must be static because hid_int_ep_write transmits asynchronously
-     * and will read this buffer after the function returns! */
-    static struct touchpad_input_report hid_report;
-    memset(&hid_report, 0, sizeof(hid_report));
+    k_spinlock_key_t key = k_spin_lock(&send_lock);
 
-    hid_report.report_id = TOUCHPAD_REPORT_ID;
+    /* Use a simple ring buffer of reports to avoid clobbering a buffer
+     * that is currently being transmitted asynchronously by the USB stack. */
+    static struct touchpad_input_report hid_reports[4];
+    static uint8_t report_idx = 0;
+    
+    struct touchpad_input_report *hid_report = &hid_reports[report_idx];
+    report_idx = (report_idx + 1) % 4;
+    
+    memset(hid_report, 0, sizeof(*hid_report));
+
+    hid_report->report_id = TOUCHPAD_REPORT_ID;
 
     /* The HID descriptor statically defines 5 finger collections.
      * We must populate all 5 slots with strictly unique contact IDs,
      * even if the module is configured to use fewer contacts. */
     for (int i = 0; i < 5; i++) {
-        struct touchpad_contact_report *dst = &hid_report.contacts[i];
+        struct touchpad_contact_report *dst = &hid_report->contacts[i];
 
-        if (i < TOUCHPAD_MAX_CONTACTS) {
+        if (i < report->contact_count) {
             const struct touchpad_contact *src = &report->contacts[i];
             /*
              * Pack the flags byte:
-             *   Bit 0 : Confidence (always 1 for valid hardware contacts)
+             *   Bit 0 : Confidence (1 for valid/lifting contacts)
              *   Bit 1 : Tip Switch
              */
             dst->flags = (uint8_t)(
-                (1U << 0)                        /* confidence (always 1) */
-              | ((src->active ? 1U : 0U) << 1)   /* tip switch            */
+                (1U << 0)                        /* confidence */
+              | ((src->active ? 1U : 0U) << 1)   /* tip switch */
             );
             dst->x = src->x;
             dst->y = src->y;
+            dst->contact_id = src->id;           /* Use uniquely generated ID from gesture logic */
         } else {
             /* Inactive contact to pad the report */
-            dst->flags = (1U << 0);              /* confidence (always 1), tip switch = 0 */
+            dst->flags = 0;                      /* confidence = 0, tip switch = 0 */
             dst->x = 0;
             dst->y = 0;
+            dst->contact_id = i;                 /* Ignored since confidence = 0 */
         }
-        dst->contact_id = i;                     /* strictly unique contact ID */
     }
 
     /* Scan time: real elapsed time in 100µs units (unit exponent -4).
-     * Using actual uptime ensures libinput computes correct velocities. */
-    uint32_t now_ms = k_uptime_get_32();
-    hid_report.scan_time = (uint16_t)((now_ms * 10) & 0xFFFF);
+     * Using actual uptime ensures libinput computes correct velocities.
+     * We strictly enforce monotonicity so rapid down/up events don't
+     * get the exact same scan time, which confuses some OS drivers. */
+    static uint32_t last_scan_time = 0;
+    uint32_t current_scan = k_uptime_get_32() * 10;
+    if (current_scan <= last_scan_time) {
+        current_scan = last_scan_time + 10; /* force +1ms */
+    }
+    last_scan_time = current_scan;
+    hid_report->scan_time = (uint16_t)(current_scan & 0xFFFF);
 
-    hid_report.contact_count = report->contact_count;
-    hid_report.buttons = report->button ? 0x01 : 0x00;
+    hid_report->contact_count = report->contact_count;
+    hid_report->buttons = report->button ? 0x01 : 0x00;
 
     /* Transmit on the interrupt-IN endpoint.  Skip the report_id byte
      * if the USB HID stack adds it automatically; Zephyr's stack
      * expects the full buffer including the report ID.                */
     int ret = hid_int_ep_write(hid_dev,
-                               (const uint8_t *)&hid_report,
-                               sizeof(hid_report),
+                               (const uint8_t *)hid_report,
+                               sizeof(*hid_report),
                                NULL);
+
+    k_spin_unlock(&send_lock, key);
+
     if (ret) {
         LOG_WRN("hid_int_ep_write failed: %d", ret);
         return ret;

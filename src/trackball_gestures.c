@@ -224,23 +224,37 @@ static void build_pinch_report(struct touchpad_report *report, int num_contacts,
  * @param num_contacts  Number of contacts (3, 4, or 5).
  * @param fingers_down  true for contact, false for lift.
  */
+static uint8_t base_contact_id = 0;
+static bool lift_report_sent = false;
+
 static void build_swipe_report(struct touchpad_report *report,
                                int num_contacts, bool fingers_down)
 {
     int32_t cx = TP_CENTER + cluster_x;
     int32_t cy = TP_CENTER + cluster_y;
 
+    if (!fingers_down) {
+        if (lift_report_sent) {
+            num_contacts = 0;
+        } else {
+            lift_report_sent = true;
+        }
+    } else {
+        lift_report_sent = false;
+    }
+
     /* The leftmost contact is offset to the left by half the total span. */
     int32_t half_span = (int32_t)(num_contacts - 1) * FINGER_SPACING / 2;
 
-    report->contact_count = fingers_down ? (uint8_t)num_contacts : 0;
+    report->contact_count = (uint8_t)num_contacts;
 
     for (int i = 0; i < num_contacts; i++) {
         int32_t fx = cx - half_span + i * FINGER_SPACING;
         int32_t fy = cy;
 
         report->contacts[i].active = fingers_down ? 1 : 0;
-        report->contacts[i].id = (uint8_t)i;
+        report->contacts[i].id = (uint8_t)((base_contact_id + i) & 0x7F);
+
         report->contacts[i].x          = (uint16_t)fx;
         report->contacts[i].y          = (uint16_t)fy;
     }
@@ -251,11 +265,16 @@ static void build_swipe_report(struct touchpad_report *report,
 /**
  * Build a complete report for the current mode and send it.
  *
- * @param fingers_down  true → contacts touching; false → lift-off.
+ * @param active  true → fingers logically down; false → lift-off.
  */
-static void send_gesture_report(bool fingers_down)
+static void send_gesture_report(bool active)
 {
     struct touchpad_report report;
+    bool fingers_down = active;
+
+    if (active) {
+        // Normal behavior: hold as long as physical key is held.
+    }
 
     memset(&report, 0, sizeof(report));
 
@@ -270,6 +289,7 @@ static void send_gesture_report(bool fingers_down)
     case GESTURE_SWIPE3:
     case GESTURE_SWIPE4:
     case GESTURE_SWIPE5:
+
         build_swipe_report(&report, contacts_for_mode(current_mode), fingers_down);
         break;
     default:
@@ -389,6 +409,8 @@ static void gesture_work_handler(struct k_work *work)
         break;
     }
 
+
+
     default:
         return;
     }
@@ -453,6 +475,7 @@ void gesture_mode_activate(enum gesture_mode mode)
     current_locked_axis = AXIS_UNLOCKED;
     last_movement_time = k_uptime_get_32();
     fingers_lifted_idle = false;
+    base_contact_id = (base_contact_id + 10) % 100;
 
     gesture_active = true;
 
