@@ -349,6 +349,12 @@ static void gesture_work_handler(struct k_work *work)
     } else {
         if (!fingers_lifted_idle && (k_uptime_get_32() - last_movement_time > CONFIG_ZMK_TRACKBALL_GESTURES_IDLE_TIMEOUT_MS)) {
             fingers_lifted_idle = true;
+            
+            /* Microsoft PTP spec requires two frames for a clean lift:
+             * 1. Tip=0 (fingers lifted)
+             * 2. Contact Count=0 (fingers no longer reported)
+             */
+            send_gesture_report(false);
             send_gesture_report(false);
             return;
         }
@@ -507,7 +513,11 @@ void gesture_mode_deactivate(void)
     /* Stop the periodic timer first to avoid races. */
     k_timer_stop(&gesture_timer);
 
-    /* Send a finger-up report (all contacts lifted). */
+    /* Microsoft PTP spec requires two frames for a clean lift:
+     * 1. Tip=0 (fingers lifted)
+     * 2. Contact Count=0 (fingers no longer reported)
+     */
+    send_gesture_report(false);
     send_gesture_report(false);
 
     gesture_active = false;
