@@ -137,6 +137,12 @@ static uint32_t last_movement_time;
 /** True if the virtual fingers are currently lifted due to inactivity. */
 static bool fingers_lifted_idle;
 
+/** Base ID used to generate unique contact tracking IDs. */
+static uint8_t base_contact_id = 0;
+
+/** State tracking for ensuring exactly one lift report is sent. */
+static bool lift_report_sent = false;
+
 /* ================================================================== */
 /* Helpers                                                             */
 /* ================================================================== */
@@ -178,7 +184,17 @@ static int contacts_for_mode(enum gesture_mode mode)
  */
 static void build_pinch_report(struct touchpad_report *report, int num_contacts, bool fingers_down)
 {
-    report->contact_count = fingers_down ? (uint8_t)num_contacts : 0;
+    if (!fingers_down) {
+        if (lift_report_sent) {
+            num_contacts = 0;
+        } else {
+            lift_report_sent = true;
+        }
+    } else {
+        lift_report_sent = false;
+    }
+
+    report->contact_count = (uint8_t)num_contacts;
 
     int32_t R = pinch_offset;
     struct { int32_t x; int32_t y; } pos[5];
@@ -205,7 +221,7 @@ static void build_pinch_report(struct touchpad_report *report, int num_contacts,
 
     for (int i = 0; i < num_contacts; i++) {
         report->contacts[i].active = fingers_down ? 1 : 0;
-        report->contacts[i].id = (uint8_t)i;
+        report->contacts[i].id = (uint8_t)((base_contact_id + i) & 0x7F);
         report->contacts[i].x = (uint16_t)(TP_CENTER + pos[i].x);
         report->contacts[i].y = (uint16_t)(TP_CENTER + pos[i].y);
     }
@@ -224,9 +240,6 @@ static void build_pinch_report(struct touchpad_report *report, int num_contacts,
  * @param num_contacts  Number of contacts (3, 4, or 5).
  * @param fingers_down  true for contact, false for lift.
  */
-static uint8_t base_contact_id = 0;
-static bool lift_report_sent = false;
-
 static void build_swipe_report(struct touchpad_report *report,
                                int num_contacts, bool fingers_down)
 {
